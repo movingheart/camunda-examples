@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" targetNamespace="http://flowengine.example">
+  <bpmn:process id="leave" name="请假审批" isExecutable="true">
+    <bpmn:startEvent id="startEvent" name="开始" />
+    <bpmn:sequenceFlow id="f1" sourceRef="startEvent" targetRef="submitTask" />
+    <bpmn:userTask id="submitTask" name="请假提交" camunda:assignee="${startBy}" />
+    <bpmn:sequenceFlow id="f2" sourceRef="submitTask" targetRef="approveTask" />
+    <bpmn:userTask id="approveTask" name="部门经理审批" camunda:candidateUsers="${manager_users}" camunda:candidateGroups="${manager_groups}" />
+    <bpmn:sequenceFlow id="f3" sourceRef="approveTask" targetRef="gateway" />
+    <bpmn:exclusiveGateway id="gateway" name="审批结果" />
+    <bpmn:sequenceFlow id="f4" name="通过" sourceRef="gateway" targetRef="endEvent">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f5" name="驳回" sourceRef="gateway" targetRef="endEvent">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="endEvent" name="结束" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_leave">
+    <bpmndi:BPMNPlane id="BPMNPlane_leave" bpmnElement="leave">
+      <bpmndi:BPMNShape id="shape_startEvent" bpmnElement="startEvent">
+        <dc:Bounds x="40" y="130" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="47" y="169" width="23" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_submitTask" bpmnElement="submitTask">
+        <dc:Bounds x="120" y="105" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_approveTask" bpmnElement="approveTask">
+        <dc:Bounds x="280" y="105" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gateway" bpmnElement="gateway" isMarkerVisible="true">
+        <dc:Bounds x="435" y="110" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="438" y="165" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_endEvent" bpmnElement="endEvent">
+        <dc:Bounds x="598" y="109" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="638" y="120" width="23" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_f1" bpmnElement="f1">
+        <di:waypoint x="76" y="147" />
+        <di:waypoint x="120" y="147" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f2" bpmnElement="f2">
+        <di:waypoint x="220" y="145" />
+        <di:waypoint x="280" y="145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f3" bpmnElement="f3">
+        <di:waypoint x="400" y="138" />
+        <di:waypoint x="438" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f4" bpmnElement="f4">
+        <di:waypoint x="474" y="124" />
+        <di:waypoint x="539" y="124" />
+        <di:waypoint x="539" y="80" />
+        <di:waypoint x="616" y="80" />
+        <di:waypoint x="616" y="109" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="502" y="149" width="23" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f5" bpmnElement="f5">
+        <di:waypoint x="480" y="140" />
+        <di:waypoint x="542" y="140" />
+        <di:waypoint x="542" y="180" />
+        <di:waypoint x="616" y="180" />
+        <di:waypoint x="616" y="145" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="502" y="108" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

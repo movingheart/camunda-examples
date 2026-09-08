@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.db
+*.sqlite3
+# 本地运行配置（含数据库口令），不入库；模板见 config.ini.example
+config.ini
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" targetNamespace="http://flowengine.example" exporter="Camunda Modeler" exporterVersion="5.50.1">
+  <bpmn:process id="expense" name="报销审批" isExecutable="true">
+    <bpmn:startEvent id="startEvent" name="开始" />
+    <bpmn:sequenceFlow id="f1" sourceRef="startEvent" targetRef="submitTask" />
+    <bpmn:userTask id="submitTask" name="报销提交" camunda:assignee="${startBy}" />
+    <bpmn:sequenceFlow id="f2" sourceRef="submitTask" targetRef="managerTask" />
+    <bpmn:userTask id="managerTask" name="部门经理审批" camunda:candidateUsers="${manager_users}" camunda:candidateGroups="${manager_groups}" />
+    <bpmn:sequenceFlow id="f3" sourceRef="managerTask" targetRef="financeTask" />
+    <bpmn:userTask id="financeTask" name="财务审批" camunda:candidateUsers="${finance_users}" />
+    <bpmn:sequenceFlow id="f4" sourceRef="financeTask" targetRef="gateway" />
+    <bpmn:exclusiveGateway id="gateway" name="审批结果" />
+    <bpmn:sequenceFlow id="f5" name="通过" sourceRef="gateway" targetRef="endEvent">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f6" name="驳回" sourceRef="gateway" targetRef="endEvent">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="endEvent" name="结束" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_expense">
+    <bpmndi:BPMNPlane id="BPMNPlane_expense" bpmnElement="expense">
+      <bpmndi:BPMNShape id="shape_startEvent" bpmnElement="startEvent">
+        <dc:Bounds x="150" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="136" y="218" width="64" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_submitTask" bpmnElement="submitTask">
+        <dc:Bounds x="240" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_managerTask" bpmnElement="managerTask">
+        <dc:Bounds x="390" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_financeTask" bpmnElement="financeTask">
+        <dc:Bounds x="540" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gateway" bpmnElement="gateway" isMarkerVisible="true">
+        <dc:Bounds x="700" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="687" y="140" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_endEvent" bpmnElement="endEvent">
+        <dc:Bounds x="820" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="827" y="219" width="23" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_f1" bpmnElement="f1">
+        <di:waypoint x="186" y="200" />
+        <di:waypoint x="240" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f2" bpmnElement="f2">
+        <di:waypoint x="340" y="200" />
+        <di:waypoint x="390" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f3" bpmnElement="f3">
+        <di:waypoint x="490" y="200" />
+        <di:waypoint x="540" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f4" bpmnElement="f4">
+        <di:waypoint x="640" y="200" />
+        <di:waypoint x="700" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f5" bpmnElement="f5">
+        <di:waypoint x="750" y="200" />
+        <di:waypoint x="820" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="766" y="180" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_f6" bpmnElement="f6">
+        <di:waypoint x="725" y="225" />
+        <di:waypoint x="725" y="300" />
+        <di:waypoint x="838" y="300" />
+        <di:waypoint x="838" y="218" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="735" y="275" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" targetNamespace="http://flowengine.example" exporter="Camunda Modeler" exporterVersion="5.50.1">
+  <bpmn:process id="proc_employee_apply" name="员工申请审批流程" isExecutable="true">
+    <bpmn:startEvent id="start_apply" name="员工发起申请">
+      <bpmn:extensionElements />
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="flow_start" sourceRef="start_apply" targetRef="exclusive_gateway_choose_type" />
+    <bpmn:exclusiveGateway id="exclusive_gateway_choose_type" name="选择申请类型" />
+    <bpmn:sequenceFlow id="flow_leave" name="选择请假" sourceRef="exclusive_gateway_choose_type" targetRef="task_leader_approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${applyType == 'leave'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_hardware" name="选择显示器申领" sourceRef="exclusive_gateway_choose_type" targetRef="task_leader_approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${applyType == 'hardware'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="task_leader_approve" name="直属上级审批" camunda:candidateUsers="${leader_users}" />
+    <bpmn:sequenceFlow id="flow_to_leader_result" sourceRef="task_leader_approve" targetRef="gateway_leader_result" />
+    <bpmn:exclusiveGateway id="gateway_leader_result" name="上级审批结果" />
+    <bpmn:sequenceFlow id="flow_leader_pass" name="通过" sourceRef="gateway_leader_result" targetRef="gateway_need_manager">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_leader_reject" name="驳回" sourceRef="gateway_leader_result" targetRef="task_employee_modify">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="task_employee_modify" name="申请人修改重提提交" camunda:assignee="${startBy}">
+      <bpmn:extensionElements>
+        <camunda:taskListener expression="${execution.setVariable(&#39;approved&#39;, true)}" event="complete" />
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="flow_back_to_choose" sourceRef="task_employee_modify" targetRef="exclusive_gateway_choose_type" />
+    <bpmn:exclusiveGateway id="gateway_need_manager" name="是否需要部门经理审批" />
+    <bpmn:sequenceFlow id="flow_no_manager" name="不需要" sourceRef="gateway_need_manager" targetRef="task_business_execute">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${needManager != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_need_manager" name="需要" sourceRef="gateway_need_manager" targetRef="task_manager_approve">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${needManager == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="task_manager_approve" name="部门经理审批" camunda:candidateUsers="${manager_users}" camunda:candidateGroups="${manager_groups}" />
+    <bpmn:sequenceFlow id="flow_to_manager_result" sourceRef="task_manager_approve" targetRef="gateway_manager_result" />
+    <bpmn:exclusiveGateway id="gateway_manager_result" name="经理审批结果" />
+    <bpmn:sequenceFlow id="flow_manager_pass" name="通过" sourceRef="gateway_manager_result" targetRef="task_business_execute">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_manager_reject" name="驳回" sourceRef="gateway_manager_result" targetRef="task_employee_modify">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="task_business_execute" name="执行业务(请假登记/IT采购显示器)" camunda:class="vender.flowengine.example.delegate.BusinessExecuteDelegate" />
+    <bpmn:sequenceFlow id="flow_to_end" sourceRef="task_business_execute" targetRef="end_success" />
+    <bpmn:endEvent id="end_success" name="流程结束" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_proc_employee_apply">
+    <bpmndi:BPMNPlane id="BPMNPlane_proc_employee_apply" bpmnElement="proc_employee_apply">
+      <bpmndi:BPMNShape id="shape_start_apply" bpmnElement="start_apply">
+        <dc:Bounds x="170" y="184" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="156" y="220" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_exclusive_gateway_choose_type" bpmnElement="exclusive_gateway_choose_type" isMarkerVisible="true">
+        <dc:Bounds x="250" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="296" y="225" width="67" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_leader_approve" bpmnElement="task_leader_approve">
+        <dc:Bounds x="360" y="50" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gateway_leader_result" bpmnElement="gateway_leader_result" isMarkerVisible="true">
+        <dc:Bounds x="500" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="430" y="198" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_employee_modify" bpmnElement="task_employee_modify">
+        <dc:Bounds x="350" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gateway_need_manager" bpmnElement="gateway_need_manager" isMarkerVisible="true">
+        <dc:Bounds x="600" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="587" y="143" width="77" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_manager_approve" bpmnElement="task_manager_approve">
+        <dc:Bounds x="700" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gateway_manager_result" bpmnElement="gateway_manager_result" isMarkerVisible="true">
+        <dc:Bounds x="860" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="852" y="156" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_business_execute" bpmnElement="task_business_execute">
+        <dc:Bounds x="980" y="170" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_success" bpmnElement="end_success">
+        <dc:Bounds x="1140" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1137" y="225" width="44" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_flow_start" bpmnElement="flow_start">
+        <di:waypoint x="206" y="203" />
+        <di:waypoint x="252" y="203" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_leave" bpmnElement="flow_leave">
+        <di:waypoint x="275" y="180" />
+        <di:waypoint x="275" y="85" />
+        <di:waypoint x="360" y="85" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="260" y="60" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_hardware" bpmnElement="flow_hardware">
+        <di:waypoint x="300" y="205" />
+        <di:waypoint x="410" y="205" />
+        <di:waypoint x="410" y="130" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="329" y="162" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_to_leader_result" bpmnElement="flow_to_leader_result">
+        <di:waypoint x="460" y="85" />
+        <di:waypoint x="525" y="85" />
+        <di:waypoint x="525" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_leader_pass" bpmnElement="flow_leader_pass">
+        <di:waypoint x="550" y="205" />
+        <di:waypoint x="600" y="205" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="564" y="180" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_leader_reject" bpmnElement="flow_leader_reject">
+        <di:waypoint x="525" y="230" />
+        <di:waypoint x="525" y="360" />
+        <di:waypoint x="450" y="360" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="529" y="285" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_back_to_choose" bpmnElement="flow_back_to_choose">
+        <di:waypoint x="350" y="360" />
+        <di:waypoint x="275" y="360" />
+        <di:waypoint x="275" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_no_manager" bpmnElement="flow_no_manager">
+        <di:waypoint x="625" y="230" />
+        <di:waypoint x="625" y="320" />
+        <di:waypoint x="1040" y="320" />
+        <di:waypoint x="1040" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="817" y="295" width="33" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_need_manager" bpmnElement="flow_need_manager">
+        <di:waypoint x="650" y="205" />
+        <di:waypoint x="675" y="205" />
+        <di:waypoint x="675" y="115" />
+        <di:waypoint x="700" y="115" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="677" y="90" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_to_manager_result" bpmnElement="flow_to_manager_result">
+        <di:waypoint x="800" y="115" />
+        <di:waypoint x="830" y="115" />
+        <di:waypoint x="830" y="205" />
+        <di:waypoint x="860" y="205" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_manager_pass" bpmnElement="flow_manager_pass">
+        <di:waypoint x="910" y="205" />
+        <di:waypoint x="980" y="205" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="934" y="180" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_manager_reject" bpmnElement="flow_manager_reject">
+        <di:waypoint x="885" y="230" />
+        <di:waypoint x="885" y="360" />
+        <di:waypoint x="450" y="360" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="889" y="263" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_to_end" bpmnElement="flow_to_end">
+        <di:waypoint x="1100" y="201" />
+        <di:waypoint x="1140" y="201" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流程引擎示例</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="brand">
+            <div class="logo">流程</div>
+            <div>
+                <div class="brand-title">流程引擎示例</div>
+                <div class="brand-sub">camunda-python 流程引擎 + SQLAlchemy</div>
+            </div>
+        </div>
+        <div class="user-box">
+            <span class="user-label">当前用户</span>
+            <select id="userSelect"></select>
+        </div>
+    </header>
+
+    <nav>
+        <button class="tab active" data-tab="start">发起流程</button>
+        <button class="tab" data-tab="todos">我的待办</button>
+        <button class="tab" data-tab="mine">我发起的</button>
+        <button class="tab" data-tab="graph">流程全景</button>
+        <button class="tab" data-tab="logs">流程日志</button>
+    </nav>
+
+    <main>
+        <!-- 发起流程 -->
+        <section id="start" class="panel active">
+            <div class="card">
+                <h2>发起申请</h2>
+                <div class="form-row">
+                    <label for="flowType">流程类型</label>
+                    <select id="flowType" onchange="toggleFlowForm()">
+                        <option value="leave">请假流程 (leave)</option>
+                        <option value="employee">员工申请流程 (employee_apply)</option>
+                        <option value="expense">报销流程 (expense)</option>
+                    </select>
+                </div>
+
+                <!-- 请假表单 -->
+                <div id="leaveForm">
+                    <div class="form-row">
+                        <label for="reason">请假事由</label>
+                        <input id="reason" type="text" placeholder="如: 家中有事, 请假两天">
+                    </div>
+                    <div class="form-row">
+                        <label for="days">请假天数</label>
+                        <input id="days" type="number" min="1" max="30" value="1">
+                    </div>
+                </div>
+
+                <!-- 员工申请表单 -->
+                <div id="employeeForm" style="display:none">
+                    <div class="form-row">
+                        <label for="eaApplyType">申请类型</label>
+                        <select id="eaApplyType">
+                            <option value="leave">请假</option>
+                            <option value="hardware">硬件申领</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="eaReason">申请事由</label>
+                        <input id="eaReason" type="text" placeholder="如: 申请一台开发笔记本">
+                    </div>
+                    <div class="form-row">
+                        <label for="eaDetail">详细说明</label>
+                        <input id="eaDetail" type="text" placeholder="补充说明(可选)">
+                    </div>
+                    <div class="form-row">
+                        <label for="eaNeedManager">需要部门经理审批?</label>
+                        <select id="eaNeedManager">
+                            <option value="false">否</option>
+                            <option value="true">是</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 报销表单 -->
+                <div id="expenseForm" style="display:none">
+                    <div class="form-row">
+                        <label for="exAmount">报销金额(元)</label>
+                        <input id="exAmount" type="number" min="1" step="0.01" value="1000" placeholder="如: 3500">
+                    </div>
+                    <div class="form-row">
+                        <label for="exReason">报销事由</label>
+                        <input id="exReason" type="text" placeholder="如: 出差交通费">
+                    </div>
+                    <div class="form-row">
+                        <label for="exDetail">详细说明</label>
+                        <input id="exDetail" type="text" placeholder="补充说明(可选)">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <button id="startBtn" class="btn primary">提交申请</button>
+                </div>
+                <div id="startResult" class="result"></div>
+            </div>
+
+            <div class="card hint">
+                <h3>演示路径</h3>
+                <ol>
+                    <li>以 <b>u001 张三</b> 发起请假申请</li>
+                    <li>在「我的待办」中先办理「请假提交」(发起人自己)</li>
+                    <li>切换到 <b>u002 李四</b>(经理组) 办理「部门经理审批」</li>
+                    <li>切回 u001 查看「我发起的」状态, 点击「全景」按钮查看整体流程</li>
+                    <li>在「流程日志」中查看全程记录</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 我的待办 -->
+        <section id="todos" class="panel">
+            <div class="toolbar">
+                <h2>我的待办</h2>
+                <button id="refreshTodos" class="btn ghost">刷新</button>
+            </div>
+            <div id="todoList" class="todo-list"></div>
+        </section>
+
+        <!-- 我发起的 -->
+        <section id="mine" class="panel">
+            <div class="toolbar">
+                <h2>我发起的流程</h2>
+                <button id="refreshMine" class="btn ghost">刷新</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>业务号</th>
+                            <th>流程</th>
+                            <th>状态</th>
+                            <th>发起时间</th>
+                            <th>结束时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mineBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 流程全景 -->
+        <section id="graph" class="panel">
+            <div class="toolbar">
+                <h2>流程全景</h2>
+                <div class="search-box">
+                    <input id="bkInput" type="text" placeholder="输入业务号, 如 LV-...">
+                    <button id="bkSearch" class="btn primary">查看</button>
+                    <button id="refreshGraph" class="btn ghost">刷新</button>
+                </div>
+            </div>
+            <div id="graphInfo" class="card"></div>
+            <div class="card">
+                <h2>流程图</h2>
+                <div class="legend">
+                    <span class="lg"><i class="dot done"></i>已完成</span>
+                    <span class="lg"><i class="dot active"></i>进行中</span>
+                    <span class="lg"><i class="dot idle"></i>未到达</span>
+                </div>
+                <div id="graphSvg" class="graph-svg"></div>
+            </div>
+            <div class="card">
+                <h2>办理轨迹</h2>
+                <div id="graphTimeline" class="timeline"></div>
+            </div>
+            <div class="card">
+                <h2>操作日志</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>节点</th>
+                            <th>操作人</th>
+                            <th>类型</th>
+                            <th>结果</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody id="graphLogs"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 流程日志 -->
+        <section id="logs" class="panel">
+            <div class="toolbar">
+                <h2>流程操作日志</h2>
+                <button id="refreshLogs" class="btn ghost">刷新</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>业务号</th>
+                            <th>节点</th>
+                            <th>操作人</th>
+                            <th>类型</th>
+                            <th>结果</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast"></div>
+    <script src="app.js"></script>
+</body>
+
+</html>

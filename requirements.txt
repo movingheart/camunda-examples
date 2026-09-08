@@ -1,0 +1,19 @@
+# flowengine-example 运行依赖
+# ─────────────────────────────────────────────────────
+# camunda-python 引擎：从 GitHub 仓库直接装
+#   pip install -r requirements.txt
+#   pip 会从 movingheart/camunda-python 拉源码，开发者改了引擎也能马上同步
+camunda-python[api] @ git+https://github.com/movingheart/camunda-python.git
+
+# Web 框架
+fastapi>=0.110
+uvicorn[standard]>=0.27
+
+# ORM（camunda-python 自身也用，但 Biz 业务层直接 import 了）
+sqlalchemy>=2.0
+
+# MySQL 驱动（不安装也能跑——内置默认 SQLite）
+pymysql>=1.1
+
+# BPMN XML 解析
+lxml>=4.9
