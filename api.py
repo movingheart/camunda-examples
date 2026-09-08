@@ -11,13 +11,13 @@
     GET  /api/process/detail   流程全景（变量/轨迹/日志/流程图）
     GET  /api/logs             操作日志
 
-任务归属在应用层判定（camunda-python 不解析 ``camunda:assignee /
-candidateUsers`` 表达式属性）：
+任务归属由引擎在 userTask 创建时求解 ``camunda:assignee`` /
+``candidateUsers`` / ``candidateGroups`` 表达式：
 
-- **任务归属**：按「流程 key + 任务节点 id」静态映射（= BPMN 表达式意图），
-  ``by_start_by`` -> 发起人本人；``role`` -> 查 ``mst_flw_rle`` 规则展开。
-- **审批例外**：审批类任务不允许发起人本人办理。
-- **操作日志**：``start`` / ``approve`` 成功后写 ``mst_flw_fsvlog``。
+- ``assignee`` 非空 -> 仅该用户可办（典型：``${startBy}`` 提交节点）
+- ``candidate_users`` 非空 -> 候选用户列表，审批类节点排除发起人本人
+- 启动流程时，本层把 ``mst_flw_rle`` 规则展开为 ``${role}_users`` /
+  ``${role}_groups`` 注入流程变量，引擎侧自动求值
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from __future__ import annotations
 import functools
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from fastapi import Body, FastAPI, Query
 from fastapi.staticfiles import StaticFiles
@@ -44,26 +44,6 @@ USERS: List[Dict[str, str]] = [
     {"id": "u004", "name": "赵六", "dpt": "市场部", "title": "市场专员", "role": "employee_role"},
     {"id": "u005", "name": "孙七", "dpt": "市场部", "title": "市场总监", "role": "boss_role"},
 ]
-
-# 任务归属：值 = (归属方式, 规则变量名)。by_start_by 对应 BPMN assignee=${startBy}；
-# role 对应 candidateUsers=${xxx_users} + candidateGroups=${xxx_groups}（规则表并集）。
-_TASK_OWNER: Dict[Tuple[str, str], Tuple[str, Optional[str]]] = {
-    ("leave", "submitTask"): ("by_start_by", None),
-    ("leave", "approveTask"): ("role", "manager"),
-    ("expense", "submitTask"): ("by_start_by", None),
-    ("expense", "managerTask"): ("role", "manager"),
-    ("expense", "financeTask"): ("role", "finance"),
-    ("proc_employee_apply", "task_leader_approve"): ("role", "leader"),
-    ("proc_employee_apply", "task_employee_modify"): ("by_start_by", None),
-    ("proc_employee_apply", "task_manager_approve"): ("role", "manager"),
-}
-
-# 「提交」类任务（写日志的 opr_typ=Submit，办理人=发起人）
-_SUBMIT_KEYS = {
-    ("leave", "submitTask"),
-    ("expense", "submitTask"),
-    ("proc_employee_apply", "task_employee_modify"),
-}
 
 # 待办卡片回显的业务变量
 _ECHO_KEYS = ("reason", "days", "applyType", "detail", "needManager", "amount")
@@ -95,7 +75,7 @@ def _business_key(prefix: str) -> str:
 
 def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
     app = FastAPI(
-        title="flowengine 流程示例 (camunda-python)",
+        title="camunda-examples 流程审批示例",
         docs_url=None,
         redoc_url=None,
     )
@@ -125,24 +105,33 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
                 out[k] = pi.variables[k]
         return out
 
-    def _owner(pi, task) -> Tuple[str, Optional[str]]:
-        return _TASK_OWNER.get(
-            (pi.process_definition_key, task.task_definition_key), ("none", None)
-        )
+    def _can_do(task, user_id: str, start_by: str) -> bool:
+        """任务归属判定（基于引擎求解后的 Task 字段）。
 
-    def _can_do(pi, task, user_id: str, mstrle_id: str) -> bool:
-        """待办/办理权限（= assignee / candidate 求值 + 审批例外）。"""
-        task_name = task.name or ""
-        start_by = pi.variables.get("startBy") or ""
-        if task_name.endswith("审批") and start_by == user_id:
-            return False  # 审批节点不允许发起人自己办理
-        kind, var = _owner(pi, task)
-        if kind == "by_start_by":
-            return start_by == user_id
-        if kind == "role" and var:
-            users, roles = biz.users_for_role(var)
-            return user_id in users or (bool(mstrle_id) and mstrle_id in roles)
+        - ``task.assignee`` 非空 -> 仅 assignee 可办（提交类节点，``${startBy}``）
+        - ``task.candidate_users`` 非空 -> 任一候选用户可办，但审批类节点排除
+          发起人本人（避免「自己批自己」）
+        - 兜底为 False（无配置则拒绝，避免越权泄漏）
+        """
+        if task.assignee:
+            return task.assignee == user_id
+        if task.candidate_users:
+            if user_id == start_by:
+                return False  # 审批类不允许发起人本人办理
+            return user_id in task.candidate_users
         return False
+
+    def _inject_role_users(vars: Dict[str, Any], roles: List[str]) -> None:
+        """按 ``mst_flw_rle`` 展开角色，把 ``{role}_users`` / ``{role}_groups``
+        注入流程变量，供引擎对 BPMN ``${manager_users}`` 等表达式求值。
+
+        ``users`` / ``groups`` 分别喂给 ``candidateUsers`` /
+        ``candidateGroups`` 通道（与 BPMN 文件中的命名一致）。
+        """
+        for role in roles:
+            users, groups = biz.users_for_role(role)
+            vars[f"{role}_users"] = users
+            vars[f"{role}_groups"] = groups
 
     def _node_type(pi, activity_id: str) -> str:
         try:
@@ -175,11 +164,9 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         bk = _business_key("LV")
         if _running_by_bk(bk):
             raise ValueError(f"流程发起失败: 同一业务ID流程尚未结束: {bk}")
-        engine.start_process_instance_by_key(
-            "leave",
-            {"reason": reason, "days": days, "businessKey": bk, "startBy": user_id},
-            business_key=bk,
-        )
+        vars = {"reason": reason, "days": days, "businessKey": bk, "startBy": user_id}
+        _inject_role_users(vars, ["manager"])  # leave.bpmn: approveTask 用 ${manager_users}
+        engine.start_process_instance_by_key("leave", vars, business_key=bk)
         biz.write_log(flw_kid="leave", bus_kid=bk, opr=user_id, tsk_nme="",
                       opr_typ="Start", opr_ret="true",
                       opr_ifo=f"请假申请已提交, 请假 {days} 天")
@@ -197,12 +184,13 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         bk = _business_key("EA")
         if _running_by_bk(bk):
             raise ValueError(f"流程发起失败: 同一业务ID流程尚未结束: {bk}")
-        engine.start_process_instance_by_key(
-            "proc_employee_apply",
-            {"applyType": apply_type, "reason": reason, "detail": detail,
-             "needManager": need_manager, "businessKey": bk, "startBy": user_id},
-            business_key=bk,
-        )
+        vars = {
+            "applyType": apply_type, "reason": reason, "detail": detail,
+            "needManager": need_manager, "businessKey": bk, "startBy": user_id,
+        }
+        # employee_apply.bpmn: leader + manager 两个审批节点
+        _inject_role_users(vars, ["leader", "manager"])
+        engine.start_process_instance_by_key("proc_employee_apply", vars, business_key=bk)
         type_txt = "请假" if apply_type == "leave" else "硬件申领"
         biz.write_log(flw_kid="proc_employee_apply", bus_kid=bk, opr=user_id,
                       tsk_nme="", opr_typ="Start", opr_ret="true",
@@ -220,12 +208,13 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         bk = _business_key("EX")
         if _running_by_bk(bk):
             raise ValueError(f"流程发起失败: 同一业务ID流程尚未结束: {bk}")
-        engine.start_process_instance_by_key(
-            "expense",
-            {"amount": amount, "reason": reason, "detail": detail,
-             "businessKey": bk, "startBy": user_id},
-            business_key=bk,
-        )
+        vars = {
+            "amount": amount, "reason": reason, "detail": detail,
+            "businessKey": bk, "startBy": user_id,
+        }
+        # expense.bpmn: manager + finance 两个审批节点
+        _inject_role_users(vars, ["manager", "finance"])
+        engine.start_process_instance_by_key("expense", vars, business_key=bk)
         biz.write_log(flw_kid="expense", bus_kid=bk, opr=user_id, tsk_nme="",
                       opr_typ="Start", opr_ret="true",
                       opr_ifo=f"报销申请已提交, 金额 {amount:g} 元")
@@ -243,7 +232,7 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
             if pi.is_completed:
                 continue
             for t in engine.create_task_query(process_instance_id=pi.id):
-                if not _can_do(pi, t, userId, mstrleId):
+                if not _can_do(t, userId, pi.variables.get("startBy", "")):
                     continue
                 task_name = t.name or ""
                 data.append({
@@ -281,7 +270,7 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         if not tasks:
             raise ValueError(f"操作失败: 任务不存在或无权操作: {task_name}")
         task = tasks[0]
-        if not _can_do(pi, task, user_id, mstrle_id):
+        if not _can_do(task, user_id, pi.variables.get("startBy", "")):
             raise ValueError(f"操作失败: 任务不存在或无权操作: {task_name}")
 
         is_modify = "修改" in task_name
@@ -292,7 +281,8 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         engine.complete_task(task.id, variables)
 
         ret = "true" if (approved or is_modify) else "false"
-        typ = "Submit" if (pi.process_definition_key, task.task_definition_key) in _SUBMIT_KEYS else "Approve"
+        # 提交类任务由 assignee 决定：assignee 非空 = ${startBy} 类提交节点
+        typ = "Submit" if task.assignee else "Approve"
         msg = comment or ("已通过" if ret == "true" else "已驳回")
         if is_modify:
             msg = comment or "修改后重新提交"
