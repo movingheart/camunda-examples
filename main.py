@@ -1,13 +1,13 @@
-"""flowengine 流程示例（Python 版）入口：对齐 Java 版 Main.java。
+"""camunda-examples 流程审批示例入口。
 
-用法（在 flowengine-example 目录下执行）：
+用法（在仓库根目录执行）：
     python main.py                              # 读取 config.ini（不存在则全默认）
     python main.py --config my.ini              # 指定配置文件
-    python main.py --db mysql+pymysql://root:******@localhost:3306/flowdb
+    python main.py --db mysql+pymysql://user:pwd@localhost:3306/flowdb
     python main.py --port 9000 --reset          # 重置业务种子数据
 
 配置优先级：命令行参数（--db/--host/--port） > 配置文件 > 内置默认值
-（默认 SQLite: flowengine-example.db, host 127.0.0.1, 端口 8080）。
+（默认 SQLite: flowengine-example.db，host 127.0.0.1，端口 8080）。
 
 配置文件 config.ini（同目录，缺省可先复制 config.ini.example）：
 
@@ -17,12 +17,12 @@
 
     [database]
     ; 二选一：整条 SQLAlchemy URL，或拆字段（程序自动拼 URL）
-    url = mysql+pymysql://root:******@localhost:3306/flowdb
+    url = mysql+pymysql://user:pwd@localhost:3306/flowdb
     driver = mysql+pymysql
     host = localhost
     port = 3306
     user = root
-    password = ******
+    password = your_password
     name = flowdb
 
     ; [database] 全部缺省 -> SQLite 文件 flowengine-example.db（零配置）
@@ -39,7 +39,7 @@ from pathlib import Path
 
 from sqlalchemy.engine import URL  # 仅用于拆字段拼 URL（依赖随引擎安装）
 
-# camunda 包由安装提供（requirements.txt: 本地 editable 依赖 ../camunda-python[api]）
+# camunda 包由 requirements.txt 从 GitHub 安装
 import uvicorn
 
 from camunda.engine.process_engine import ProcessEngine  # noqa: E402
@@ -56,7 +56,7 @@ _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8080
 _CONFIG_FILE = Path(__file__).resolve().parent / "config.ini"
 
-# 部署清单：(展示名, 定义 key, 文件名) —— BPMN 为 Java 版原文件
+# 部署清单：(展示名, definition key, BPMN 文件名)
 _FLOWS = [
     ("请假审批流程", "leave", "leave.bpmn"),
     ("员工申请审批流程", "proc_employee_apply", "employee_apply.bpmn"),
@@ -64,8 +64,8 @@ _FLOWS = [
 ]
 
 _BANNER = """
-  flowengine 流程示例 (camunda-python)
-  ====================================
+  camunda-examples 流程审批示例
+  ==============================
   演示用户: u001 张三 / u002 李四 / u003 王五 (研发部, manager_role)
            u004 赵六 / u005 孙七 (市场部, boss_role)
   权限规则: submit(所有用户) / manager(u001,u002,u003+manager_role)
@@ -128,7 +128,7 @@ def _server_from_cfg(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="flowengine 流程示例 (camunda-python)")
+    parser = argparse.ArgumentParser(description="camunda-examples 流程审批示例")
     parser.add_argument(
         "--config", default=None,
         help=f"配置文件路径（默认 {_CONFIG_FILE.name}，与 main.py 同目录；"
@@ -137,7 +137,7 @@ def main() -> None:
     parser.add_argument(
         "--db", default=None,
         help="数据库连接串，覆盖配置文件 [database]：SQLite 文件路径或 MySQL URL，"
-             "如 mysql+pymysql://root:pass@localhost:3306/flowdb",
+             "如 mysql+pymysql://user:pass@localhost:3306/flowdb",
     )
     parser.add_argument("--reset", action="store_true", help="重建业务种子数据")
     parser.add_argument(
@@ -170,7 +170,7 @@ def main() -> None:
     engine = ProcessEngine(store=Store(db))
 
     _deploy(engine, bpmn_dir)
-    # serviceTask camunda:class -> 短名 BusinessExecuteDelegate（对齐 JavaDelegate 注册）
+    # 注册 serviceTask 委托：BPMN 中 camunda:class 收敛成短名 "BusinessExecuteDelegate"
     engine.register_delegate("BusinessExecuteDelegate", business_execute)
 
     app = create_app(engine, biz)

@@ -1,14 +1,13 @@
-"""业务库存取层：对齐 Java 示例的业务表语义。
+"""业务库存取层：权限规则 + 操作日志。
 
-Java 版依赖 flowengine 框架的「权限规则插件」读 mst_flw_rle 并把结果展开成
-流程变量（${manager_users} / ${manager_groups}），日志由框架写入
-mst_flw_fsvlog。本模块用纯 SQLAlchemy 在同一数据库里复刻这两张表 +
-用户/部门/角色/用户组主数据，并直接提供「规则展开」与「日志读写」两个能力
-（插件语义 → 显式函数，表结构与列名与 Java 版完全一致）。
+本模块用纯 SQLAlchemy 提供两张业务表：
 
-依赖说明：
-- 引擎的 ACT_* 表（由 camunda.persistence.store.Store 自动建表）与这里的
-  业务表可共库；默认 SQLite（一条命令可跑），也支持 MySQL（mysql+pymysql://…）。
+- ``mst_flw_rle``：权限规则（哪个角色能办哪个任务 / BPMN 变量）
+- ``mst_flw_fsvlog``：操作日志（流程发起 / 审批通过 / 驳回等）
+
+引擎的 ACT_* 表（由 ``camunda.persistence.store.Store`` 自动建表）与这里的
+业务表可共库；默认 SQLite（一条命令可跑），也支持 MySQL（``mysql+pymysql://``）
+与 PostgreSQL。
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from sqlalchemy import (
 )
 
 # ---------------------------------------------------------------------------
-# 表结构（与 Java 版 init_biz_tables.sql / init_example_data.sql 对齐）
+# 表结构（mst_flw_rle 权限规则 + mst_flw_fsvlog 操作日志）
 # ---------------------------------------------------------------------------
 _meta = MetaData()
 
@@ -91,7 +90,7 @@ mst_flw_fsvlog = Table(
 )
 
 # ---------------------------------------------------------------------------
-# 种子数据（对齐 Java init_example_data.sql，规则 rle_var ↔ BPMN 变量）
+# 种子数据（权限规则：rle_var ↔ BPMN 流程变量名）
 # ---------------------------------------------------------------------------
 SEED = {
     "dpt": [("D001",), ("D002",)],
@@ -262,7 +261,7 @@ class Biz:
 
     @staticmethod
     def _dec(b64: str) -> str:
-        """读取时解码回明文中文（对齐 Java decodeOprIfo：解不出就原样返回）。"""
+        """读取时解码回明文中文：解不出就原样返回。"""
         if not b64:
             return ""
         try:

@@ -1,6 +1,6 @@
-"""FastAPI 业务路由：对齐 Java 示例的 web/ApiServlet.java。
+"""FastAPI 业务路由。
 
-响应契约与 Java 版完全一致（{success, data|message}），前端 app.js 原样复用：
+响应契约统一为 ``{success, data | message}``：
     GET  /api/users            用户列表
     POST /api/start            发起请假 (leave)
     POST /api/start/employee   发起员工申请 (proc_employee_apply)
@@ -11,13 +11,13 @@
     GET  /api/process/detail   流程全景（变量/轨迹/日志/流程图）
     GET  /api/logs             操作日志
 
-Java 版里 userTask 的 assignee/candidateUsers 表达式由 flowengine 框架求值、
-办理人身份写进程变量，日志由框架写入 mst_flw_fsvlog。camunda-python 不解析
-userTask 表达式属性，因此本层显式实现同一语义：
-- 任务归属：按「流程 key + 任务节点 id」静态映射（= BPMN 表达式意图），
-  by_start_by -> 发起人本人；role -> 查 mst_flw_rle 规则展开（rules.Biz）。
-- 审批例外：审批类任务不允许发起人本人办理（对齐 Java customCheckUserRule）。
-- 操作日志：start/approve 成功后写 mst_flw_fsvlog（opr_ifo 落 Base64）。
+任务归属在应用层判定（camunda-python 不解析 ``camunda:assignee /
+candidateUsers`` 表达式属性）：
+
+- **任务归属**：按「流程 key + 任务节点 id」静态映射（= BPMN 表达式意图），
+  ``by_start_by`` -> 发起人本人；``role`` -> 查 ``mst_flw_rle`` 规则展开。
+- **审批例外**：审批类任务不允许发起人本人办理。
+- **操作日志**：``start`` / ``approve`` 成功后写 ``mst_flw_fsvlog``。
 """
 
 from __future__ import annotations
@@ -65,14 +65,14 @@ _SUBMIT_KEYS = {
     ("proc_employee_apply", "task_employee_modify"),
 }
 
-# 待办卡片回显的业务变量（Java 示例同款 keep 集合）
+# 待办卡片回显的业务变量
 _ECHO_KEYS = ("reason", "days", "applyType", "detail", "needManager", "amount")
 # 流程变量里不面向业务展示的引擎注入键
 _SYS_KEYS = {"businessKey", "startBy"}
 
 
 def _wrap(fn):
-    """对齐 Java catch-all：业务异常一律 {success:false, message}，HTTP 200。"""
+    """业务异常一律 {success:false, message}，HTTP 200。"""
 
     @functools.wraps(fn)
     def inner(*args, **kwargs):
@@ -85,7 +85,7 @@ def _wrap(fn):
 
 
 def _to_view(ts: Optional[str]) -> str:
-    """ISO 时间 -> 'yyyy-MM-dd HH:mm:ss'（与 Java fmt 一致，前端 fmtTime 兼容）。"""
+    """ISO 时间 -> 'yyyy-MM-dd HH:mm:ss'（前端 fmtTime 兼容）。"""
     return (ts or "").replace("T", " ")[:19]
 
 
@@ -108,7 +108,7 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
             return key
 
     def _running_by_bk(business_key: str) -> Optional[Any]:
-        """业务号 -> 最新运行中实例（同一业务号不允许并发活动流程，对齐 Java）。"""
+        """业务号 -> 最新运行中实例（同一业务号不允许并发活动流程）。"""
         cands = [
             pi for pi in engine.list_process_instances()
             if pi.business_key == business_key and not pi.is_completed
@@ -131,7 +131,7 @@ def create_app(engine: ProcessEngine, biz: Biz) -> FastAPI:
         )
 
     def _can_do(pi, task, user_id: str, mstrle_id: str) -> bool:
-        """待办/办理权限（= assignee/candidate 求值 + customCheckUserRule）。"""
+        """待办/办理权限（= assignee / candidate 求值 + 审批例外）。"""
         task_name = task.name or ""
         start_by = pi.variables.get("startBy") or ""
         if task_name.endswith("审批") and start_by == user_id:

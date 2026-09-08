@@ -1,4 +1,4 @@
-; flowengine 流程示例配置文件（对齐 Java 版 myapp.conf 的角色）
+; camunda-examples 配置文件模板
 ; 使用：复制本文件为 config.ini（main.py 默认读取同目录 config.ini），按需修改后直接
 ;   copy config.ini.example config.ini      # Windows
 ;   cp config.ini.example config.ini        # macOS / Linux
@@ -14,7 +14,7 @@ port = 8080
 ; 无需任何数据库服务即可运行）：
 
 ; 写法一：整条 SQLAlchemy URL（密码含 @ : / 等特殊字符时需自行 URL 编码）
-; url = mysql+pymysql://root:wst5878067@localhost:3306/flowdb
+; url = mysql+pymysql://user:password@localhost:3306/flowdb
 
 ; 写法二：拆字段，程序自动拼 URL（推荐，密码无需手工编码）。
 ; driver 缺省为 mysql+pymysql（需先 pip install pymysql）
@@ -22,5 +22,5 @@ driver = mysql+pymysql
 host = localhost
 port = 3306
 user = root
-password = wst5878067
+password = your_password_here
 name = flowdb

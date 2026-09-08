@@ -1,13 +1,13 @@
-"""流程全景 SVG 数据（对齐 Java ProcessGraphUtil 的输出结构）。
+"""流程全景 SVG 数据。
 
-前端 app.js#renderGraphSvg 期望的 graph 结构：
+前端 ``app.js#renderGraphSvg`` 期望的 graph 结构：
     graph.process: [
-        {nodeType, id, name, bounds:{x,y,width,height}, state},      // 形状节点
-        {nodeType:"sequenceFlow", id, name, waypoints:[{x,y}], state} // 连线
+        {nodeType, id, name, bounds:{x,y,width,height}, state},      # 形状节点
+        {nodeType:"sequenceFlow", id, name, waypoints:[{x,y}], state} # 连线
     ]
     state: "completed" | "active" | "idle"（上色：绿/蓝/灰）
 
-数据来源：部署时保留的原始 BPMN XML 里的 bpmndi:BPMNDiagram（bounds/waypoints
+数据来源：部署时保留的原始 BPMN XML 里的 ``bpmndi:BPMNDiagram``（bounds / waypoints
 来自 Camunda Modeler 绘图坐标），状态由引擎的活动痕迹 activity_history 推导。
 """
 
@@ -28,7 +28,7 @@ _NS = {
     "di": _DI_NS,
 }
 
-# 节点类型 -> 前端可识别的小驼峰名（Java activityType 风格）
+# 节点类型 -> 前端可识别的小驼峰名
 _TYPE_NAME = {
     "UserTask": "userTask",
     "ServiceTask": "serviceTask",

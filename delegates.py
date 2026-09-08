@@ -1,8 +1,8 @@
-"""serviceTask 委托实现（对齐 Java BusinessExecuteDelegate）。
+"""serviceTask 委托实现。
 
-员工申请流程的「执行业务」节点：BPMN 里 camunda:class 指向
-vender.flowengine.example.delegate.BusinessExecuteDelegate，camunda-python
-解析器会把全类名收敛成短名 BusinessExecuteDelegate —— 因此注册名必须一致：
+员工申请流程的「执行业务」节点：BPMN 里 ``camunda:class`` 指向
+``BusinessExecuteDelegate``（短名），注册名必须一致：
+
     engine.register_delegate("BusinessExecuteDelegate", business_execute)
 
 请假 -> 登记考勤；硬件申领 -> 生成采购单（示例仅打印日志并写流程变量，
