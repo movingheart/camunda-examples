@@ -10,6 +10,9 @@
 
 - **三条开箱即用的审批流程**：请假（leave）、员工申请（employee_apply）、报销
   （expense），含排他网关 / 多角色审批 / serviceTask / 驳回重提。
+- **任务归属写在 BPMN 节点上**：userTask 直接声明 `camunda:assignee` /
+  `candidateUsers` / `candidateGroups`（支持 `${var}` 表达式），引擎解析节点
+  变量并在任务创建时求值，应用层不再维护「流程-节点-权限」映射表。
 - **可交互的 Web 前端**：纯 HTML / JS，无需任何构建步骤；流程全景含 SVG 流程图
   （绿=已过 / 蓝=进行中 / 灰=未达）、办理轨迹时间线、操作日志。
 - **真实持久化**：业务流程用 SQLite / PostgreSQL / MySQL（与引擎共用 ACT_* 表）；
@@ -30,7 +33,7 @@
 git clone https://github.com/movingheart/camunda-examples.git
 cd camunda-examples
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt                     # 引擎 camunda-python[api] 从 PyPI 安装
 python main.py
 ```
 
@@ -105,7 +108,7 @@ camunda-examples/
 ├── graph.py         # BPMN DI -> 流程图数据（SVG 渲染所需）
 ├── delegates.py     # serviceTask 委托
 ├── config.ini.example   # 配置文件模板（复制为 config.ini 使用）
-├── requirements.txt # 运行依赖
+├── requirements.txt # 运行依赖（camunda-python[api] 来自 PyPI，>=0.1.2）
 ├── bpmn/            # 三条流程的 BPMN 定义文件
 └── webapp/          # 静态前端（index.html / app.js / style.css）
 ```
@@ -113,28 +116,32 @@ camunda-examples/
 ## 添加自己的流程
 
 1. 把 `.bpmn` 文件放到 `bpmn/` 目录
-2. 在 `main.py` 的 `_DEPLOYMENTS` 列表里加一行 `(展示名, definition_key, "文件名.bpmn")`
-3. 重启 `python main.py`，引擎会自动以新版本 +1 部署
+2. 在 `main.py` 的 `_FLOWS` 列表里加一行 `(展示名, definition_key, "文件名.bpmn")`
+3. userTask 节点直接写 `camunda:assignee` / `candidateUsers` / `candidateGroups`
+   （可用 `${var}` 引用流程变量，如 `${manager_users}`），引擎会解析节点变量
+4. 重启 `python main.py`，引擎会自动以新版本 +1 部署
 
 ## 引擎升级
 
-`requirements.txt` 用 PEP 508 形式直接从 GitHub 安装 `camunda-python[api]`：
+`requirements.txt` 直接从 PyPI 安装正式包 `camunda-python[api]`：
 
 ```
-camunda-python[api] @ git+https://github.com/movingheart/camunda-python.git
+camunda-python[api]>=0.1.2
 ```
 
-要切到某个固定版本，把 `@main` 换成 tag：
-
-```
-camunda-python[api] @ git+https://github.com/movingheart/camunda-python.git@v0.2.0
-```
+- 0.1.2 起引擎会在 userTask 创建时解析节点上的归属变量并对 `${...}` 求值
+  （`camunda:assignee` / `candidateUsers` / `candidateGroups`）
+- 要锁定行为，可收紧到 `>=0.1.2,<0.2`；升级后执行 `pip install -U -r requirements.txt`
+- 引擎变更记录见 https://github.com/movingheart/camunda-python/blob/main/CHANGELOG.md
 
 ## 已知限制
 
-- 任务归属在应用层判定（`biz.py#users_for_role`），不依赖引擎解析
-  `camunda:assignee / candidateUsers` 表达式属性。改权限规则直接编辑
-  `mst_flw_rle` 表即可生效（支持日期列有效期）。
+- 角色 -> 用户/候选组的展开在应用层完成（`biz.py#users_for_role` 读
+  `mst_flw_rle`），展开结果以 `{role}_users` / `{role}_groups` 注入流程变量，
+  再由引擎对 BPMN 节点里的 `${manager_users}` 等表达式求值。改权限规则直接
+  编辑 `mst_flw_rle` 表即可生效（支持日期列有效期）。
+- 审批类节点「发起人本人不可办理」是示例的业务策略（`api.py#_can_do`），
+  属应用层判定而非引擎语义；引擎只负责解析节点变量给出候选集。
 - 流程实例当前归属与变量走引擎内存视图（`mst_flw_fsvlog` 操作日志持久化）；
   ACT_* 历史表仍会落库（Store 持久化），但本示例读取走内存视角。
 

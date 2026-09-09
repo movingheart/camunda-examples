@@ -1,9 +1,10 @@
-# flowengine-example 运行依赖
+# camunda-examples 运行依赖
 # ─────────────────────────────────────────────────────
-# camunda-python 引擎：从 GitHub 仓库直接装
+# camunda-python 引擎：从 PyPI 安装正式版（0.1.2 起支持解析 userTask
+# 节点变量：camunda:assignee / candidateUsers / candidateGroups 在任务
+# 创建时对 ${...} 表达式求值）
 #   pip install -r requirements.txt
-#   pip 会从 movingheart/camunda-python 拉源码，开发者改了引擎也能马上同步
-camunda-python[api] @ git+https://github.com/movingheart/camunda-python.git
+camunda-python[api]>=0.1.2
 
 # Web 框架
 fastapi>=0.110

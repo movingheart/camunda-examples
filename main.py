@@ -39,7 +39,7 @@ from pathlib import Path
 
 from sqlalchemy.engine import URL  # 仅用于拆字段拼 URL（依赖随引擎安装）
 
-# camunda 包由 requirements.txt 从 GitHub 安装
+# camunda-python 引擎由 requirements.txt 从 PyPI 安装（正式版 >=0.1.2）
 import uvicorn
 
 from camunda.engine.process_engine import ProcessEngine  # noqa: E402
